@@ -6,6 +6,7 @@ import ipdb
 from flask import Flask, render_template, jsonify, request
 from dotenv import load_dotenv, find_dotenv
 
+load_dotenv()
 
 # DB Connection
 import mysql.connector
@@ -16,10 +17,7 @@ mydb = mysql.connector.connect(
 )
 mycursor = mydb.cursor(buffered=True)
 
-
-
-
-stripe.api_key = "sk_test_51MwjIqSGXC921HlElKIOHY9dorOBqYIl0NxSKtaaTMEvJlLdpuARk7MMVq7P8t3wOoXcLghNpDwyi7wxNeSnXSWz00uQgBInzx"
+stripe.api_key = os.getenv("stripe_key")
 print(stripe.Plan.list())
 
 app = Flask(__name__)
@@ -27,19 +25,15 @@ app = Flask(__name__)
 @app.route('/get-ticket-state', methods = ['POST'])
 def get_ticket_state():
     data = request.json
-    sql = f"Select * from transaction where User = 1 and Source = {data['source']} and Destination = {data['destination']} and Route = {data['route']}"
+    sql = f"Select * from transaction where User = {data.userId} and Source = {data['source']} and Destination = {data['destination']} and Route = {data['route']}"
     mycursor.execute(sql)
     transactions = mycursor.fetchall()
     print(transactions)
     if(len(transactions) == 0):
         return jsonify({"ticket_state" : 0})
-    # ipdb.set_trace()
     
     return jsonify({"ticket_state" : transactions[0][4]})
     
-
-
-
 @app.route('/validate-ticket', methods = ['POST'])
 def consume_ticket():
     data = request.json
@@ -86,10 +80,7 @@ def get_tickets():
     mycursor.execute("SELECT * FROM transaction")
     transactions = mycursor.fetchall()
  
-    # ipdb.set_trace()
     print(transactions)
-    
- 
     return jsonify({"tickets" : transactions})
 
 @app.route('/payment-sheet', methods=['POST'])
@@ -97,20 +88,15 @@ def payment_sheet():
 
     
     print(request.json)
+    data = request.json
     # ipdb.set_trace()
     # Set your secret key. Remember to switch to your live secret key in production.
     # See your keys here: https://dashboard.stripe.com/apikeys
     stripe.api_key = 'sk_test_51MwjIqSGXC921HlElKIOHY9dorOBqYIl0NxSKtaaTMEvJlLdpuARk7MMVq7P8t3wOoXcLghNpDwyi7wxNeSnXSWz00uQgBInzx'
     # Use an existing Customer ID if this is a returning customer
     customer = stripe.Customer.create(
-        name="Jenny Rosen",
-        address={
-            "line1": "510 Townsend St",
-            "postal_code": "98140",
-            "city": "San Francisco",
-            "state": "CA",
-            "country": "US",
-        },
+        name= data.name,
+        address= data.address
     )
 
     ephemeralKey = stripe.EphemeralKey.create(
@@ -121,7 +107,7 @@ def payment_sheet():
         amount=100+request.json['price']*100,
         currency='inr',
         customer=customer['id'],
-        description="Software development services",
+        description=data.desc,
         automatic_payment_methods={
             'enabled': True,
         },
@@ -131,12 +117,6 @@ def payment_sheet():
     return jsonify(paymentIntent=paymentIntent.client_secret,
                    ephemeralKey=ephemeralKey.secret,
                    customer=customer.id,
-                   publishableKey='pk_test_51MwjIqSGXC921HlEuJpzifXA235k4a2G5GlhAQxyYdyXm2YfuqVLlY74Pm3oDXfMZngpuizJ8mzmMHWNLarsCXWW00JwrSd0It')
-
-
-
-
-
-
+                   publishableKey=os.getenv("PUNISHABLE_KEY"))
 
 app.run(port=4242, host='0.0.0.0')
